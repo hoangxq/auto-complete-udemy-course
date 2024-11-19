@@ -1,4 +1,4 @@
-# Auto complete udemy courses in two minutes
+# Auto complete udemy courses in two minutes (include quizz)
 
 
 ## Required
