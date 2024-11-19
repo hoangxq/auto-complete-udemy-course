@@ -1,8 +1,16 @@
 var lectures = [];
 var quizzs = [];
+var courseId = null;
 
-// Change your courseId in this line
-const courseId = 00000000;
+const divElement = document.querySelector('div[data-module-id="course-taking"]');
+if (divElement) {
+    const moduleArgs = JSON.parse(divElement.getAttribute('data-module-args'));
+    console.log("moduleArgs", moduleArgs);
+    courseId = moduleArgs.courseId;
+} else {
+    console.error('element with data-module-id "course-taking" not exist.');
+}
+console.log("Course Id", courseId);
 
 async function fetchCourse(courseId) {
     try {
@@ -15,8 +23,8 @@ async function fetchCourse(courseId) {
         const data = await response.json();
         lectures = data.results.filter(e => e._class === "lecture");
         quizzs = data.results.filter(e => e._class === "quiz");
-        console.log(lectures);
-        console.log(quizzs);
+        console.log("lectures list", lectures);
+        console.log("quizzs list", quizzs);
 
         for (const lecture of lectures) {
             await fetchLectures(courseId, lecture.id);  
@@ -74,7 +82,7 @@ async function fetchQuizz(courseId, quizzId) {
 
         const data = await response.json();
         let asssessments = data.results;
-        console.log(asssessments);
+        console.log("asssessments list", asssessments);
         
         const responseUserAttemptedQuizzes = await fetch(`https://lg-cns.udemy.com/api-2.0/users/me/subscribed-courses/${courseId}/quizzes/${quizzId}/user-attempted-quizzes/?fields[user_attempted_quiz]=id,created,viewed_time,completion_time,version,completed_assessments,results_summary`, {
               "headers": {
@@ -102,7 +110,7 @@ async function fetchQuizz(courseId, quizzId) {
         }
         
         let userAttemptedQuizzes = await responseUserAttemptedQuizzes.json();
-        console.log(userAttemptedQuizzes);
+        console.log("userAttemptedQuizzes", userAttemptedQuizzes);
         
         for (const asssessment of asssessments) {
             await fetchAsssessment(asssessment, userAttemptedQuizzes);
