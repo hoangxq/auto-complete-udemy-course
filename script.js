@@ -4,6 +4,7 @@ var courseId = null;
 let completed_lecture_ids = [];
 let completed_quiz_ids = [];
 let completed_assignment_ids = [];
+const ROOT_URL = "https://" + location.host;
 
 const divElement = document.querySelector('div[data-module-id="course-taking"]');
 if (divElement) {
@@ -17,7 +18,7 @@ console.log("Course Id", courseId);
 
 async function fetchProgress(courseId) {
     try {
-        const response = await fetch(`https://lg-cns.udemy.com/api-2.0/users/me/subscribed-courses/${courseId}/progress/?fields[course]=completed_lecture_ids,completed_quiz_ids,last_seen_page,completed_assignment_ids,first_completion_time`);
+        const response = await fetch(`${ROOT_URL}/api-2.0/users/me/subscribed-courses/${courseId}/progress/?fields[course]=completed_lecture_ids,completed_quiz_ids,last_seen_page,completed_assignment_ids,first_completion_time`);
 
         if (!response.ok) {
             throw new Error('Network response was not ok');
@@ -37,7 +38,7 @@ async function fetchProgress(courseId) {
 
 async function fetchCourse(courseId) {
     try {
-        const response = await fetch(`https://lg-cns.udemy.com/api-2.0/courses/${courseId}/subscriber-curriculum-items/?page_size=1000&fields[lecture]=title,object_index,is_published,sort_order,created,asset,supplementary_assets,is_free&fields[quiz]=title,object_index,is_published,sort_order,type&fields[practice]=title,object_index,is_published,sort_order&fields[chapter]=title,object_index,is_published,sort_order&fields[asset]=title,filename,asset_type,status,time_estimation,is_external&caching_intent=True`);
+        const response = await fetch(`${ROOT_URL}/api-2.0/courses/${courseId}/subscriber-curriculum-items/?page_size=1000&fields[lecture]=title,object_index,is_published,sort_order,created,asset,supplementary_assets,is_free&fields[quiz]=title,object_index,is_published,sort_order,type&fields[practice]=title,object_index,is_published,sort_order&fields[chapter]=title,object_index,is_published,sort_order&fields[asset]=title,filename,asset_type,status,time_estimation,is_external&caching_intent=True`);
 
         if (!response.ok) {
             throw new Error('Network response was not ok');
@@ -64,7 +65,7 @@ async function fetchCourse(courseId) {
 async function fetchLectures(courseId, lectureId) {
     await new Promise(resolve => setTimeout(resolve, 100)); // Đợi 3 giây trước khi fetch
     try {
-        const response = await fetch(`https://lg-cns.udemy.com/api-2.0/users/me/subscribed-courses/${courseId}/completed-lectures/`, {
+        const response = await fetch(`${ROOT_URL}/api-2.0/users/me/subscribed-courses/${courseId}/completed-lectures/`, {
             "headers": {
                 "accept": "application/json, text/plain, */*",
                 "accept-language": "en-US",
@@ -97,7 +98,7 @@ async function fetchLectures(courseId, lectureId) {
 
 async function fetchQuizz(courseId, quizzId) {
     try {
-        const response = await fetch(`https://lg-cns.udemy.com/api-2.0/quizzes/${quizzId}/assessments/?version=1&page_size=1000&fields[assessment]=id,assessment_type,prompt,correct_response,section,question_plain,related_lectures&use_remote_version=true`);
+        const response = await fetch(`${ROOT_URL}/api-2.0/quizzes/${quizzId}/assessments/?version=1&page_size=1000&fields[assessment]=id,assessment_type,prompt,correct_response,section,question_plain,related_lectures&use_remote_version=true`);
 
         if (!response.ok) {
             throw new Error('Network response was not ok');
@@ -107,7 +108,7 @@ async function fetchQuizz(courseId, quizzId) {
         let asssessments = data.results;
         console.log("asssessments list", asssessments);
 
-        const responseUserAttemptedQuizzes = await fetch(`https://lg-cns.udemy.com/api-2.0/users/me/subscribed-courses/${courseId}/quizzes/${quizzId}/user-attempted-quizzes/?fields[user_attempted_quiz]=id,created,viewed_time,completion_time,version,completed_assessments,results_summary`, {
+        const responseUserAttemptedQuizzes = await fetch(`${ROOT_URL}/api-2.0/users/me/subscribed-courses/${courseId}/quizzes/${quizzId}/user-attempted-quizzes/?fields[user_attempted_quiz]=id,created,viewed_time,completion_time,version,completed_assessments,results_summary`, {
             "headers": {
                 "accept": "application/json, text/plain, */*",
                 "accept-language": "en-US",
@@ -147,7 +148,7 @@ async function fetchAsssessment(asssessment, userAttemptedQuizzes) {
     await new Promise(resolve => setTimeout(resolve, 100)); // Đợi 3 giây trước khi fetch
     try {
         const correctResponse = '[' + asssessment.correct_response.map(item => `\\"${item}\\"`).join(', ') + ']';
-        const response = await fetch(`https://lg-cns.udemy.com/api-2.0/users/me/subscribed-courses/${courseId}/user-attempted-quizzes/${userAttemptedQuizzes.id}/assessment-answers/?fields[user_answers_assessment]=id,response,assessment,is_marked_for_review,score`, {
+        const response = await fetch(`${ROOT_URL}/api-2.0/users/me/subscribed-courses/${courseId}/user-attempted-quizzes/${userAttemptedQuizzes.id}/assessment-answers/?fields[user_answers_assessment]=id,response,assessment,is_marked_for_review,score`, {
             "headers": {
                 "accept": "application/json, text/plain, */*",
                 "accept-language": "en-US",
