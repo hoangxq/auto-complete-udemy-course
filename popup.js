@@ -19,18 +19,34 @@ const initProgress = async () => {
     }
 }
 
-initProgress();
-
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "updateProgress") {
         progress += request.progressIndex;
-        if (progress > 100) {
+        if (progress >= 100) {
             progress = 100;
+            const button = document.getElementById('progressBtn');
+            const loadingFetchData = document.getElementById('loadingFetchData');
+            const courseCompleted = document.getElementById('courseCompleted');
+            loadingFetchData.style.display = 'none';
+            button.style.display = 'none';
+            courseCompleted.style.display = 'block';
         }
         progressFill.style.width =
             `${progress}%`;
         progressText.textContent =
             `${Math.round(progress)}%`;
+    } else if (request.action === "enableButtonProgress") {
+        const button = document.getElementById('progressBtn');
+        const loadingFetchData = document.getElementById('loadingFetchData');
+        const courseCompleted = document.getElementById('courseCompleted');
+        loadingFetchData.style.display = 'none';
+        if (progress >= 100) courseCompleted.style.display = 'block';
+        else button.style.display = 'block';
+    } else if (request.action === "progressing") {
+        const button = document.getElementById('progressBtn');
+        const loadingFetchData = document.getElementById('loadingFetchData');
+        loadingFetchData.style.display = 'block';
+        button.style.display = 'none';
     }
 });
 
@@ -56,6 +72,10 @@ const getProgress = () => {
 
     const updateProgressBar = (progressIndex) => {
         chrome.runtime.sendMessage({ action: "updateProgress", progressIndex: progressIndex });
+    };
+
+    const enableButtonProgress = () => {
+        chrome.runtime.sendMessage({ action: "enableButtonProgress" });
     };
 
     async function fetchCourse(courseId) {
@@ -96,6 +116,7 @@ const getProgress = () => {
 
             let progressCompleted = (completed_lecture_ids.length + completed_quiz_ids.length + completed_assignment_ids.length) * progressIndex;
             updateProgressBar(progressCompleted);
+            enableButtonProgress();
         } catch (error) {
             console.error('There was a problem with the fetch operation:', error);
         }
@@ -136,6 +157,9 @@ const progressCourse = () => {
                 throw new Error('Network response was not ok');
             }
 
+            // Update progress status into Popup
+            chrome.runtime.sendMessage({ action: "progressing", progressIndex: progressIndex });
+
             const data = await response.json();
             console.log("course progress data", data);
             completed_lecture_ids = data.completed_lecture_ids;
@@ -156,20 +180,22 @@ const progressCourse = () => {
                 throw new Error('Network response was not ok');
             }
 
-            const data = await response.json();
-            lectures = data.results.filter(e => e._class === "lecture" && !completed_lecture_ids.includes(e.id));
-            quizzs = data.results.filter(e => e._class === "quiz" && !completed_quiz_ids.includes(e.id));
+            let data = await response.json();
+            data = data.results;
+
+            lectures = data.filter(e => e._class === "lecture" && !completed_lecture_ids.includes(e.id));
+            quizzs = data.filter(e => e._class === "quiz" && !completed_quiz_ids.includes(e.id));
             console.log("lectures list", lectures);
             console.log("quizzs list", quizzs);
 
-            progressIndex = 100 / data.results.filter(e => e._class === "lecture" || e._class === "quiz").length;
+            const dataFetchs = data.filter(e => lectures.map(l => l.id).includes(e.id) || quizzs.map(q => q.id).includes(e.id));
+            progressIndex = 100 / data.filter(e => e._class === "lecture" || e._class === "quiz").length;
 
-            for (const lecture of lectures) {
-                await fetchLectures(courseId, lecture.id);
-            }
-
-            for (const quizz of quizzs) {
-                await fetchQuizz(courseId, quizz.id);
+            for (const section of dataFetchs) {
+                if (section._class === "lecture")
+                    await fetchLectures(courseId, section.id);
+                else if (section._class === "quiz")
+                    await fetchQuizz(courseId, section.id);
             }
         } catch (error) {
             console.error('There was a problem with the fetch operation:', error);
@@ -254,7 +280,7 @@ const progressCourse = () => {
             for (const asssessment of asssessments) {
                 await fetchAsssessment(asssessment, userAttemptedQuizzes);
             }
-            updateProgressBar();
+            updateProgressBar(progressIndex);
         } catch (error) {
             console.error('There was a problem with the fetch operation:', error);
         }
@@ -323,3 +349,5 @@ document.getElementsByTagName("BODY")[0].onclick = function (e) {
     chrome.tabs.create({ url: href });
     return false;
 };
+
+initProgress();
