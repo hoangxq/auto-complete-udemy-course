@@ -39,9 +39,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const button = document.getElementById('progressBtn');
         const loadingFetchData = document.getElementById('loadingFetchData');
         const courseCompleted = document.getElementById('courseCompleted');
-        loadingFetchData.style.display = 'none';
-        if (progress >= 100) courseCompleted.style.display = 'block';
-        else button.style.display = 'block';
+        
+        if (request.isScriptRunning == true) {
+            courseCompleted.style.display = 'none';
+            button.style.display = 'none';
+            loadingFetchData.style.display = 'block';
+        }
+        else if (progress >= 100) {
+            courseCompleted.style.display = 'block';
+            button.style.display = 'none';
+            loadingFetchData.style.display = 'none';
+        } else {
+            courseCompleted.style.display = 'none';
+            button.style.display = 'block';
+            loadingFetchData.style.display = 'none';
+        }
     } else if (request.action === "progressing") {
         const button = document.getElementById('progressBtn');
         const loadingFetchData = document.getElementById('loadingFetchData');
@@ -51,58 +63,59 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 const getProgress = () => {
-    const ROOT_URL = "https://" + location.host;
-    var lectures = [];
-    var quizzs = [];
-    var courseId = null;
-    let completed_lecture_ids = [];
-    let completed_quiz_ids = [];
-    let completed_assignment_ids = [];
-    let progressIndex = 0;
+    const GP_ROOT_URL = "https://" + location.host;
+    var gpLectures = [];
+    var gpQuizzs = [];
+    var gpCourseId = null;
+    let gpCompleted_lecture_ids = [];
+    let gpCompleted_quiz_ids = [];
+    let gpCompleted_assignment_ids = [];
+    let gpProgressIndex = 0;
 
-    const divElement = document.querySelector('div[data-module-id="course-taking"]');
-    if (divElement) {
-        const moduleArgs = JSON.parse(divElement.getAttribute('data-module-args'));
+    const gpDivElement = document.querySelector('div[data-module-id="course-taking"]');
+    if (gpDivElement) {
+        const moduleArgs = JSON.parse(gpDivElement.getAttribute('data-module-args'));
         console.log("moduleArgs", moduleArgs);
-        courseId = moduleArgs.courseId;
+        gpCourseId = moduleArgs.courseId;
     } else {
         console.error('element with data-module-id "course-taking" not exist.');
     }
-    console.log("Course Id", courseId);
+    console.log("Course Id", gpCourseId);
 
-    const updateProgressBar = (progressIndex) => {
+    const gpUpdateProgressBar = (progressIndex) => {
         chrome.runtime.sendMessage({ action: "updateProgress", progressIndex: progressIndex });
     };
 
-    const enableButtonProgress = () => {
-        chrome.runtime.sendMessage({ action: "enableButtonProgress" });
+    const gpEnableButtonProgress = () => {
+        const isRunning = typeof window.isScriptRunning !== 'undefined' ? window.isScriptRunning : false;
+        chrome.runtime.sendMessage({ action: "enableButtonProgress", isScriptRunning: isRunning ?? false });
     };
 
-    async function fetchCourse(courseId) {
+    async function gpFetchCourse(courseId) {
         try {
-            const response = await fetch(`${ROOT_URL}/api-2.0/courses/${courseId}/subscriber-curriculum-items/?page_size=1000&fields[lecture]=title,object_index,is_published,sort_order,created,asset,supplementary_assets,is_free&fields[quiz]=title,object_index,is_published,sort_order,type&fields[practice]=title,object_index,is_published,sort_order&fields[chapter]=title,object_index,is_published,sort_order&fields[asset]=title,filename,asset_type,status,time_estimation,is_external&caching_intent=True`);
+            const response = await fetch(`${GP_ROOT_URL}/api-2.0/courses/${courseId}/subscriber-curriculum-items/?page_size=1000&fields[lecture]=title,object_index,is_published,sort_order,created,asset,supplementary_assets,is_free&fields[quiz]=title,object_index,is_published,sort_order,type&fields[practice]=title,object_index,is_published,sort_order&fields[chapter]=title,object_index,is_published,sort_order&fields[asset]=title,filename,asset_type,status,time_estimation,is_external&caching_intent=True`);
 
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
 
             const data = await response.json();
-            lectures = data.results.filter(e => e._class === "lecture");
-            quizzs = data.results.filter(e => e._class === "quiz");
-            console.log("lectures list", lectures);
-            console.log("quizzs list", quizzs);
+            gpLectures = data.results.filter(e => e._class === "lecture");
+            gpQuizzs = data.results.filter(e => e._class === "quiz");
+            console.log("lectures list", gpLectures);
+            console.log("quizzs list", gpQuizzs);
 
-            progressIndex = 100 / (lectures.length + quizzs.length);
+            gpProgressIndex = 100 / (gpLectures.length + gpQuizzs.length);
 
-            fetchProgress(courseId);
+            gpFetchProgress(courseId);
         } catch (error) {
             console.error('There was a problem with the fetch operation:', error);
         }
     }
 
-    async function fetchProgress(courseId) {
+    async function gpFetchProgress(courseId) {
         try {
-            const response = await fetch(`${ROOT_URL}/api-2.0/users/me/subscribed-courses/${courseId}/progress/?fields[course]=completed_lecture_ids,completed_quiz_ids,last_seen_page,completed_assignment_ids,first_completion_time`);
+            const response = await fetch(`${GP_ROOT_URL}/api-2.0/users/me/subscribed-courses/${courseId}/progress/?fields[course]=completed_lecture_ids,completed_quiz_ids,last_seen_page,completed_assignment_ids,first_completion_time`);
 
             if (!response.ok) {
                 throw new Error('Network response was not ok');
@@ -110,19 +123,19 @@ const getProgress = () => {
 
             const data = await response.json();
             console.log("course progress data", data);
-            completed_lecture_ids = data.completed_lecture_ids;
-            completed_quiz_ids = data.completed_quiz_ids;
-            completed_assignment_ids = data.completed_assignment_ids;
+            gpCompleted_lecture_ids = data.completed_lecture_ids;
+            gpCompleted_quiz_ids = data.completed_quiz_ids;
+            gpCompleted_assignment_ids = data.completed_assignment_ids;
 
-            let progressCompleted = (completed_lecture_ids.length + completed_quiz_ids.length + completed_assignment_ids.length) * progressIndex;
-            updateProgressBar(progressCompleted);
-            enableButtonProgress();
+            let progressCompleted = (gpCompleted_lecture_ids.length + gpCompleted_quiz_ids.length + gpCompleted_assignment_ids.length) * gpProgressIndex;
+            gpUpdateProgressBar(progressCompleted);
+            gpEnableButtonProgress();
         } catch (error) {
             console.error('There was a problem with the fetch operation:', error);
         }
     }
 
-    fetchCourse(courseId);
+    gpFetchCourse(gpCourseId);
 }
 
 const progressCourse = () => {
@@ -134,6 +147,9 @@ const progressCourse = () => {
     let completed_quiz_ids = [];
     let completed_assignment_ids = [];
     let progressIndex = 0;
+
+    // Flag to check script is running
+    window.isScriptRunning = true;
 
     const divElement = document.querySelector('div[data-module-id="course-taking"]');
     if (divElement) {
@@ -197,6 +213,8 @@ const progressCourse = () => {
                 else if (section._class === "quiz")
                     await fetchQuizz(courseId, section.id);
             }
+            console.log("Script is done!!!")
+            window.isScriptRunning = false; 
         } catch (error) {
             console.error('There was a problem with the fetch operation:', error);
         }
