@@ -412,6 +412,8 @@ const progressCourse = () => {
             } else {
                 console.error(`Fetch failed for asssessment ${asssessment.id}`);
             }
+
+            await new Promise(resolve => setTimeout(resolve, 60000)); // waiting for submit code
         } catch (error) {
             console.error(`Error fetching for asssessment ${asssessment.id}: ${error}`);
         }
