@@ -39,7 +39,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const button = document.getElementById('progressBtn');
         const loadingFetchData = document.getElementById('loadingFetchData');
         const courseCompleted = document.getElementById('courseCompleted');
-        
+
         if (request.isScriptRunning == true) {
             courseCompleted.style.display = 'none';
             button.style.display = 'none';
@@ -211,10 +211,10 @@ const progressCourse = () => {
                 if (section._class === "lecture")
                     await fetchLectures(courseId, section.id);
                 else if (section._class === "quiz")
-                    await fetchQuizz(courseId, section.id);
+                    await fetchQuizz(courseId, section.id, section.type);
             }
             console.log("Script is done!!!")
-            window.isScriptRunning = false; 
+            window.isScriptRunning = false;
         } catch (error) {
             console.error('There was a problem with the fetch operation:', error);
         }
@@ -255,18 +255,8 @@ const progressCourse = () => {
         }
     }
 
-    async function fetchQuizz(courseId, quizzId) {
+    async function fetchQuizz(courseId, quizzId, quizzType) {
         try {
-            const response = await fetch(`${ROOT_URL}/api-2.0/quizzes/${quizzId}/assessments/?version=1&page_size=1000&fields[assessment]=id,assessment_type,prompt,correct_response,section,question_plain,related_lectures&use_remote_version=true`);
-
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-
-            const data = await response.json();
-            let asssessments = data.results;
-            console.log("asssessments list", asssessments);
-
             const responseUserAttemptedQuizzes = await fetch(`${ROOT_URL}/api-2.0/users/me/subscribed-courses/${courseId}/quizzes/${quizzId}/user-attempted-quizzes/?fields[user_attempted_quiz]=id,created,viewed_time,completion_time,version,completed_assessments,results_summary`, {
                 "headers": {
                     "accept": "application/json, text/plain, */*",
@@ -295,9 +285,61 @@ const progressCourse = () => {
             let userAttemptedQuizzes = await responseUserAttemptedQuizzes.json();
             console.log("userAttemptedQuizzes", userAttemptedQuizzes);
 
-            for (const asssessment of asssessments) {
-                await fetchAsssessment(asssessment, userAttemptedQuizzes);
+            if (quizzType === "coding-exercise") {
+                const responseAsssessment = await fetch(`${ROOT_URL}/api-2.0/quizzes/${quizzId}/assessments/?version=1&page_size=250&fields[assessment]=id,assessment_type,prompt,correct_response,related_lectures&use_remote_version=true`, {
+                    "headers": {
+                        "accept": "application/json, text/plain, */*",
+                        "accept-language": "en-US",
+                        "priority": "u=1, i",
+                        "sec-ch-ua": "\"Not(A:Brand\";v=\"99\", \"Google Chrome\";v=\"133\", \"Chromium\";v=\"133\"",
+                        "sec-ch-ua-mobile": "?0",
+                        "sec-ch-ua-platform": "\"Windows\"",
+                        "sec-fetch-dest": "empty",
+                        "sec-fetch-mode": "cors",
+                        "sec-fetch-site": "same-origin",
+                        "x-requested-with": "XMLHttpRequest",
+                        "x-udemy-cache-brand": "221764KRen_US",
+                        "x-udemy-cache-campaign-code": "24T3MT270225",
+                        "x-udemy-cache-device": "None",
+                        "x-udemy-cache-language": "en",
+                        "x-udemy-cache-logged-in": "1",
+                        "x-udemy-cache-marketplace-country": "KR",
+                        "x-udemy-cache-price-country": "KR",
+                        "x-udemy-cache-release": "4dc9010e36f2d4086e3a",
+                        "x-udemy-cache-user": "269374812",
+                        "x-udemy-cache-version": "1"
+                    },
+                    "referrerPolicy": "strict-origin-when-cross-origin",
+                    "body": null,
+                    "method": "GET",
+                    "mode": "cors",
+                    "credentials": "include"
+                });
+
+                if (!responseAsssessment.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                let asssessment = await responseAsssessment.json();
+                console.log("responseAsssessment", responseAsssessment);
+
+                await fetchCodeExercise(asssessment.results[0], userAttemptedQuizzes);
+            } else if (quizzType === "simple-quiz") {
+                const response = await fetch(`${ROOT_URL}/api-2.0/quizzes/${quizzId}/assessments/?version=1&page_size=1000&fields[assessment]=id,assessment_type,prompt,correct_response,section,question_plain,related_lectures&use_remote_version=true`);
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json();
+                let asssessments = data.results;
+                console.log("asssessments list", asssessments);
+
+                for (const asssessment of asssessments) {
+                    await fetchAsssessment(asssessment, userAttemptedQuizzes);
+                }
             }
+
             updateProgressBar(progressIndex);
         } catch (error) {
             console.error('There was a problem with the fetch operation:', error);
@@ -324,6 +366,42 @@ const progressCourse = () => {
                 },
                 "referrerPolicy": "strict-origin-when-cross-origin",
                 "body": `{\"assessment_id\":${asssessment.id},\"response\":\"${correctResponse}\",\"duration\":2}`,
+                "method": "POST",
+                "mode": "cors",
+                "credentials": "include"
+            });
+
+            if (response.ok) {
+                console.log(`Fetch successful for asssessment ${asssessment.id}`);
+            } else {
+                console.error(`Fetch failed for asssessment ${asssessment.id}`);
+            }
+        } catch (error) {
+            console.error(`Error fetching for asssessment ${asssessment.id}: ${error}`);
+        }
+    }
+
+    async function fetchCodeExercise(asssessment, userAttemptedQuizzes) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        try {
+            const correctResponse = JSON.stringify(asssessment.prompt.solution_files[0].content).slice(1, -1);
+
+            const response = await fetch(`${ROOT_URL}/api-2.0/users/me/subscribed-courses/${courseId}/user-attempted-quizzes/${userAttemptedQuizzes.id}/coding-exercise-answers/`, {
+                "headers": {
+                    "accept": "application/json, text/plain, */*",
+                    "accept-language": "en-US",
+                    "content-type": "application/json",
+                    "priority": "u=1, i",
+                    "sec-ch-ua": "\"Not(A:Brand\";v=\"99\", \"Google Chrome\";v=\"133\", \"Chromium\";v=\"133\"",
+                    "sec-ch-ua-mobile": "?0",
+                    "sec-ch-ua-platform": "\"Windows\"",
+                    "sec-fetch-dest": "empty",
+                    "sec-fetch-mode": "cors",
+                    "sec-fetch-site": "same-origin",
+                    "x-requested-with": "XMLHttpRequest"
+                },
+                "referrerPolicy": "strict-origin-when-cross-origin",
+                "body": `{\"assessment_id\":${asssessment.id},\"response\":{\"files\":[{\"file_name\":\"${asssessment.prompt.solution_files[0].file_name}\",\"content\":\"${correctResponse}\"}]},\"pusher_channel\":\"v22714229105287\",\"isOutputEvaluation\":false}`,
                 "method": "POST",
                 "mode": "cors",
                 "credentials": "include"
