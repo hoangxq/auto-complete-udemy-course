@@ -1,5 +1,6 @@
 const progressFill = document.getElementById('progressBar');
 const progressText = document.getElementById('progressText');
+const progressLog = document.getElementById('progressLog');
 let progress = 0;
 
 const initProgress = async () => {
@@ -30,6 +31,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             loadingFetchData.style.display = 'none';
             button.style.display = 'none';
             courseCompleted.style.display = 'block';
+            progressLog.textContent = "Empty";
         }
         progressFill.style.width =
             `${progress}%`;
@@ -44,6 +46,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             courseCompleted.style.display = 'none';
             button.style.display = 'none';
             loadingFetchData.style.display = 'block';
+            progressLog.textContent = "fetching";
         }
         else if (progress >= 100) {
             courseCompleted.style.display = 'block';
@@ -59,6 +62,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const loadingFetchData = document.getElementById('loadingFetchData');
         loadingFetchData.style.display = 'block';
         button.style.display = 'none';
+    } else if (request.action === "progressLog") {
+        progressLog.textContent = request.progressLog;
     }
 });
 
@@ -91,13 +96,19 @@ const getProgress = () => {
         chrome.runtime.sendMessage({ action: "enableButtonProgress", isScriptRunning: isRunning ?? false });
     };
 
+    const gpUpdateProgressLog = (progressLog) => {
+        chrome.runtime.sendMessage({ action: "progressLog", progressLog: progressLog });
+    };
+
     async function gpFetchCourse(courseId) {
         try {
+            gpUpdateProgressLog("gpFetchCourse");
             const response = await fetch(`${GP_ROOT_URL}/api-2.0/courses/${courseId}/subscriber-curriculum-items/?page_size=1000&fields[lecture]=title,object_index,is_published,sort_order,created,asset,supplementary_assets,is_free&fields[quiz]=title,object_index,is_published,sort_order,type&fields[practice]=title,object_index,is_published,sort_order&fields[chapter]=title,object_index,is_published,sort_order&fields[asset]=title,filename,asset_type,status,time_estimation,is_external&caching_intent=True`);
 
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
+            gpUpdateProgressLog("Empty");
 
             const data = await response.json();
             gpLectures = data.results.filter(e => e._class === "lecture");
@@ -115,11 +126,13 @@ const getProgress = () => {
 
     async function gpFetchProgress(courseId) {
         try {
+            gpUpdateProgressLog("gpFetchProgress");
             const response = await fetch(`${GP_ROOT_URL}/api-2.0/users/me/subscribed-courses/${courseId}/progress/?fields[course]=completed_lecture_ids,completed_quiz_ids,last_seen_page,completed_assignment_ids,first_completion_time`);
 
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
+            gpUpdateProgressLog("Empty");
 
             const data = await response.json();
             console.log("course progress data", data);
@@ -165,13 +178,19 @@ const progressCourse = () => {
         chrome.runtime.sendMessage({ action: "updateProgress", progressIndex: progressIndex });
     };
 
+    const updateProgressLog = (progressLog) => {
+        chrome.runtime.sendMessage({ action: "progressLog", progressLog: progressLog });
+    };
+
     async function fetchProgress(courseId) {
         try {
+            updateProgressLog("fetchProgress");
             const response = await fetch(`${ROOT_URL}/api-2.0/users/me/subscribed-courses/${courseId}/progress/?fields[course]=completed_lecture_ids,completed_quiz_ids,last_seen_page,completed_assignment_ids,first_completion_time`);
 
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
+            updateProgressLog("Empty");
 
             // Update progress status into Popup
             chrome.runtime.sendMessage({ action: "progressing", progressIndex: progressIndex });
@@ -190,11 +209,13 @@ const progressCourse = () => {
 
     async function fetchCourse(courseId) {
         try {
+            updateProgressLog("fetchCourse");
             const response = await fetch(`${ROOT_URL}/api-2.0/courses/${courseId}/subscriber-curriculum-items/?page_size=1000&fields[lecture]=title,object_index,is_published,sort_order,created,asset,supplementary_assets,is_free&fields[quiz]=title,object_index,is_published,sort_order,type&fields[practice]=title,object_index,is_published,sort_order&fields[chapter]=title,object_index,is_published,sort_order&fields[asset]=title,filename,asset_type,status,time_estimation,is_external&caching_intent=True`);
 
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
+            updateProgressLog("Empty");
 
             let data = await response.json();
             data = data.results;
@@ -223,6 +244,7 @@ const progressCourse = () => {
     async function fetchLectures(courseId, lectureId) {
         await new Promise(resolve => setTimeout(resolve, 100));
         try {
+            updateProgressLog("fetchLectures");
             const response = await fetch(`${ROOT_URL}/api-2.0/users/me/subscribed-courses/${courseId}/completed-lectures/`, {
                 "headers": {
                     "accept": "application/json, text/plain, */*",
@@ -249,6 +271,7 @@ const progressCourse = () => {
             } else {
                 console.error(`Fetch failed for lecture ${lectureId}`);
             }
+            updateProgressLog("Empty");
             updateProgressBar(progressIndex);
         } catch (error) {
             console.error(`Error fetching for lecture ${lectureId}: ${error}`);
@@ -257,6 +280,7 @@ const progressCourse = () => {
 
     async function fetchQuizz(courseId, quizzId, quizzType) {
         try {
+            updateProgressLog("fetchQuizz");
             const responseUserAttemptedQuizzes = await fetch(`${ROOT_URL}/api-2.0/users/me/subscribed-courses/${courseId}/quizzes/${quizzId}/user-attempted-quizzes/?fields[user_attempted_quiz]=id,created,viewed_time,completion_time,version,completed_assessments,results_summary`, {
                 "headers": {
                     "accept": "application/json, text/plain, */*",
@@ -281,11 +305,13 @@ const progressCourse = () => {
             if (!responseUserAttemptedQuizzes.ok) {
                 throw new Error('Network response was not ok');
             }
+            updateProgressLog("Empty");
 
             let userAttemptedQuizzes = await responseUserAttemptedQuizzes.json();
             console.log("userAttemptedQuizzes", userAttemptedQuizzes);
 
             if (quizzType === "coding-exercise") {
+                updateProgressLog("fetch Assessment coding exercise");
                 const responseAsssessment = await fetch(`${ROOT_URL}/api-2.0/quizzes/${quizzId}/assessments/?version=1&page_size=250&fields[assessment]=id,assessment_type,prompt,correct_response,related_lectures&use_remote_version=true`, {
                     "headers": {
                         "accept": "application/json, text/plain, */*",
@@ -297,17 +323,7 @@ const progressCourse = () => {
                         "sec-fetch-dest": "empty",
                         "sec-fetch-mode": "cors",
                         "sec-fetch-site": "same-origin",
-                        "x-requested-with": "XMLHttpRequest",
-                        "x-udemy-cache-brand": "221764KRen_US",
-                        "x-udemy-cache-campaign-code": "24T3MT270225",
-                        "x-udemy-cache-device": "None",
-                        "x-udemy-cache-language": "en",
-                        "x-udemy-cache-logged-in": "1",
-                        "x-udemy-cache-marketplace-country": "KR",
-                        "x-udemy-cache-price-country": "KR",
-                        "x-udemy-cache-release": "4dc9010e36f2d4086e3a",
-                        "x-udemy-cache-user": "269374812",
-                        "x-udemy-cache-version": "1"
+                        "x-requested-with": "XMLHttpRequest"
                     },
                     "referrerPolicy": "strict-origin-when-cross-origin",
                     "body": null,
@@ -319,17 +335,20 @@ const progressCourse = () => {
                 if (!responseAsssessment.ok) {
                     throw new Error('Network response was not ok');
                 }
+                updateProgressLog("Empty");
 
                 let asssessment = await responseAsssessment.json();
                 console.log("responseAsssessment", responseAsssessment);
 
                 await fetchCodeExercise(asssessment.results[0], userAttemptedQuizzes);
             } else if (quizzType === "simple-quiz") {
+                updateProgressLog("fetch Assessment quizz");
                 const response = await fetch(`${ROOT_URL}/api-2.0/quizzes/${quizzId}/assessments/?version=1&page_size=1000&fields[assessment]=id,assessment_type,prompt,correct_response,section,question_plain,related_lectures&use_remote_version=true`);
 
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
+                updateProgressLog("Empty");
 
                 const data = await response.json();
                 let asssessments = data.results;
@@ -386,6 +405,7 @@ const progressCourse = () => {
         try {
             const correctResponse = JSON.stringify(asssessment.prompt.solution_files[0].content).slice(1, -1);
 
+            updateProgressLog("submiting coding exercise");
             const response = await fetch(`${ROOT_URL}/api-2.0/users/me/subscribed-courses/${courseId}/user-attempted-quizzes/${userAttemptedQuizzes.id}/coding-exercise-answers/`, {
                 "headers": {
                     "accept": "application/json, text/plain, */*",
@@ -413,7 +433,8 @@ const progressCourse = () => {
                 console.error(`Fetch failed for asssessment ${asssessment.id}`);
             }
 
-            await new Promise(resolve => setTimeout(resolve, 60000)); // waiting for submit code
+            await new Promise(resolve => setTimeout(resolve, 30000)); // waiting for submit code
+            updateProgressLog("Empty");
         } catch (error) {
             console.error(`Error fetching for asssessment ${asssessment.id}: ${error}`);
         }
